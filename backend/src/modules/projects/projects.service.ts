@@ -21,7 +21,7 @@ export async function getAll() {
     orderBy: { createdAt: 'desc' },
     include: {
       _count: { select: { contracts: true } },
-      budgets: { where: { isActive: true }, select: { totalAmount: true } },
+      budgets: { select: { totalAmount: true } },
     },
   })
   return projects.map(p => ({
@@ -35,7 +35,7 @@ export async function getById(id: string) {
   const project = await prisma.project.findUnique({
     where: { id },
     include: {
-      budgets: { orderBy: { version: 'desc' } },
+      budgets: true,
       contracts: {
         include: { provider: true, additives: true, payments: { where: { status: { in: ['approved', 'paid'] } } } },
       },

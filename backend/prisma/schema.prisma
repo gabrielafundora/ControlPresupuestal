@@ -38,10 +38,7 @@ model Project {
 
 model Budget {
   id          String    @id @default(cuid())
-  projectId   String
-  version     Int
-  label       String?
-  isActive    Boolean   @default(false)
+  projectId   String    @unique
   totalAmount Float     @default(0)
   notes       String?
   approvedAt  DateTime?
@@ -51,27 +48,42 @@ model Budget {
 
   project   Project          @relation(fields: [projectId], references: [id])
   lineItems BudgetLineItem[]
-
-  @@unique([projectId, version])
 }
 
 model BudgetLineItem {
-  id          String   @id @default(cuid())
-  budgetId    String
-  code        String
-  category    String
-  description String
-  unit        String
-  quantity    Float
-  unitPrice   Float
-  totalAmount Float
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(cuid())
+  budgetId       String
+  code           String
+  category       String
+  description    String
+  unit           String
+  quantity       Float
+  unitPrice      Float
+  approvedAmount Float    @default(0)
+  totalAmount    Float
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  budget    Budget     @relation(fields: [budgetId], references: [id])
-  contracts Contract[]
+  budget      Budget             @relation(fields: [budgetId], references: [id])
+  contracts   Contract[]
+  adjustments BudgetAdjustment[]
 
   @@unique([budgetId, code])
+}
+
+model BudgetAdjustment {
+  id          String    @id @default(cuid())
+  lineItemId  String
+  type        String
+  amount      Float
+  groupId     String?
+  description String
+  approvedAt  DateTime?
+  approvedBy  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  lineItem BudgetLineItem @relation(fields: [lineItemId], references: [id])
 }
 
 model Provider {
@@ -137,7 +149,7 @@ model Payment {
   periodEnd       DateTime
   percentComplete Float
   amount          Float
-  status          String    @default("draft")
+  status          String    @default("approved")
   invoiceNumber   String?
   invoiceDate     DateTime?
   paidAt          DateTime?

@@ -214,16 +214,11 @@ function ContractDetail({ contract, onClose }: { contract: Contract; onClose: ()
 function ContractForm({ projectId, onClose }: { projectId: string; onClose: () => void }) {
   const qc = useQueryClient()
   const { data: providers } = useQuery<Provider[]>({ queryKey: ['providers'], queryFn: () => api.get('/providers').then(r => r.data) })
-  const { data: budgets } = useQuery<{ id: string; isActive: boolean; version: number; label: string }[]>({
-    queryKey: ['budgets', projectId],
+  const { data: budget } = useQuery<{ id: string; lineItems: Array<{ id: string; code: string; description: string; category: string }> } | null>({
+    queryKey: ['budget', 'project', projectId],
     queryFn: () => api.get(`/projects/${projectId}/budgets`).then(r => r.data),
   })
-  const activeBudget = budgets?.find(b => b.isActive)
-  const { data: activeBudgetDetail } = useQuery<{ lineItems: Array<{ id: string; code: string; description: string; category: string }> }>({
-    queryKey: ['budget', activeBudget?.id],
-    queryFn: () => api.get(`/projects/${projectId}/budgets/${activeBudget?.id}`).then(r => r.data),
-    enabled: !!activeBudget?.id,
-  })
+  const activeBudgetDetail = budget
 
   const [form, setForm] = useState({ budgetLineItemId: '', providerId: '', contractNumber: '', description: '', originalAmount: '', startDate: '', endDate: '', notes: '' })
   const [error, setError] = useState('')
@@ -247,7 +242,7 @@ function ContractForm({ projectId, onClose }: { projectId: string; onClose: () =
         onChange={e => set('budgetLineItemId', e.target.value)}
         required
         options={lineItemOptions}
-        placeholder={activeBudget ? 'Seleccionar partida...' : 'Sin presupuesto activo'}
+        placeholder={budget ? 'Seleccionar partida...' : 'Sin presupuesto'}
       />
       <Select label="Proveedor" value={form.providerId} onChange={e => set('providerId', e.target.value)} required options={providers?.map(p => ({ value: p.id, label: p.name })) || []} placeholder="Seleccionar proveedor..." />
       <div className="grid grid-cols-2 gap-4">

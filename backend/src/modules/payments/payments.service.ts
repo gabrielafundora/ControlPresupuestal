@@ -32,27 +32,13 @@ export async function getById(contractId: string, id: string) {
 export async function create(contractId: string, userId: string, data: z.infer<typeof createPaymentSchema>) {
   const contract = await prisma.contract.findUnique({
     where: { id: contractId },
-    include: { additives: true, payments: { orderBy: { estimateNumber: 'desc' } } },
+    include: { payments: { orderBy: { estimateNumber: 'desc' } } },
   })
   if (!contract) throw new AppError(404, 'Contrato no encontrado')
 
-  // Validar porcentaje mayor que el anterior
   const lastPayment = contract.payments[0]
   if (lastPayment && data.percentComplete < lastPayment.percentComplete) {
     throw new AppError(422, `El porcentaje de avance debe ser mayor o igual al anterior (${lastPayment.percentComplete}%)`)
-  }
-
-  // Calcular monto autorizado
-  const authorized = contract.originalAmount + contract.additives.reduce((sum, a) => {
-    return sum + (a.type === 'additive' ? a.amount : -a.amount)
-  }, 0)
-
-  // Validar que el acumulado no supere el monto autorizado
-  const paid = contract.payments
-    .filter(p => ['approved', 'paid'].includes(p.status))
-    .reduce((sum, p) => sum + p.amount, 0)
-  if (paid + data.amount > authorized * 1.01) { // 1% tolerancia
-    throw new AppError(422, `El monto acumulado excede el monto autorizado del contrato (${authorized.toLocaleString('es-MX', { style: 'currency', currency: 'MXN' })})`)
   }
 
   const number = (lastPayment?.estimateNumber ?? 0) + 1
@@ -66,34 +52,11 @@ export async function create(contractId: string, userId: string, data: z.infer<t
       periodEnd: new Date(data.periodEnd),
       percentComplete: data.percentComplete,
       amount: data.amount,
+      status: 'approved',
       invoiceNumber: data.invoiceNumber,
       invoiceDate: data.invoiceDate ? new Date(data.invoiceDate) : undefined,
       notes: data.notes,
     },
     include: { submittedBy: { select: { name: true } } },
-  })
-}
-
-export async function updateStatus(contractId: string, id: string, status: string, userId: string) {
-  const payment = await prisma.payment.findFirst({ where: { id, contractId } })
-  if (!payment) throw new AppError(404, 'Estimación no encontrada')
-
-  const validTransitions: Record<string, string[]> = {
-    draft: ['submitted'],
-    submitted: ['approved', 'rejected'],
-    approved: ['paid'],
-    rejected: ['draft'],
-  }
-
-  if (!validTransitions[payment.status]?.includes(status)) {
-    throw new AppError(422, `No se puede cambiar de "${payment.status}" a "${status}"`)
-  }
-
-  return prisma.payment.update({
-    where: { id },
-    data: {
-      status,
-      paidAt: status === 'paid' ? new Date() : undefined,
-    },
   })
 }

@@ -74,9 +74,6 @@ async function main() {
   const presupuesto = await prisma.budget.create({
     data: {
       projectId: proyecto.id,
-      version: 1,
-      label: 'Presupuesto Original',
-      isActive: true,
       totalAmount: 45_000_000,
       approvedAt: new Date('2024-01-10'),
       approvedBy: admin.name,
@@ -89,6 +86,7 @@ async function main() {
             unit: 'Global',
             quantity: 1,
             unitPrice: 850_000,
+            approvedAmount: 850_000,
             totalAmount: 850_000,
           },
           {
@@ -98,6 +96,7 @@ async function main() {
             unit: 'Global',
             quantity: 1,
             unitPrice: 8_500_000,
+            approvedAmount: 8_500_000,
             totalAmount: 8_500_000,
           },
           {
@@ -107,6 +106,7 @@ async function main() {
             unit: 'Global',
             quantity: 1,
             unitPrice: 12_000_000,
+            approvedAmount: 12_000_000,
             totalAmount: 12_000_000,
           },
           {
@@ -116,6 +116,7 @@ async function main() {
             unit: 'Global',
             quantity: 1,
             unitPrice: 7_500_000,
+            approvedAmount: 7_500_000,
             totalAmount: 7_500_000,
           },
           {
@@ -125,6 +126,7 @@ async function main() {
             unit: 'Global',
             quantity: 1,
             unitPrice: 9_000_000,
+            approvedAmount: 9_000_000,
             totalAmount: 9_000_000,
           },
           {
@@ -134,6 +136,7 @@ async function main() {
             unit: 'Global',
             quantity: 1,
             unitPrice: 5_500_000,
+            approvedAmount: 5_500_000,
             totalAmount: 5_500_000,
           },
           {
@@ -143,6 +146,7 @@ async function main() {
             unit: 'Global',
             quantity: 1,
             unitPrice: 1_650_000,
+            approvedAmount: 1_650_000,
             totalAmount: 1_650_000,
           },
         ],

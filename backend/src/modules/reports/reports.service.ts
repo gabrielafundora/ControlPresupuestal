@@ -5,7 +5,7 @@ export async function getProjectSummary(projectId: string) {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: {
-      budgets: { where: { isActive: true }, include: { lineItems: true } },
+      budgets: { include: { lineItems: true } },
       contracts: {
         include: {
           additives: true,
@@ -16,15 +16,14 @@ export async function getProjectSummary(projectId: string) {
   })
   if (!project) throw new AppError(404, 'Proyecto no encontrado')
 
-  const activeBudget = project.budgets[0]
-  const budgetTotal = activeBudget?.totalAmount ?? 0
+  const budget = project.budgets[0]
+  const approvedTotal = budget?.lineItems.reduce((s, i) => s + i.approvedAmount, 0) ?? 0
+  const budgetTotal = budget?.totalAmount ?? 0
 
   const contractSummary = project.contracts.map(c => {
     const authorized = c.originalAmount + c.additives.reduce((sum, a) =>
       sum + (a.type === 'additive' ? a.amount : -a.amount), 0)
-    const executed = c.payments.filter(p => ['approved', 'paid'].includes(p.status))
-      .reduce((sum, p) => sum + p.amount, 0)
-    const paid = c.payments.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0)
+    const executed = c.payments.reduce((sum, p) => sum + p.amount, 0)
     const lastPayment = c.payments.sort((a, b) => b.estimateNumber - a.estimateNumber)[0]
     return {
       contractId: c.id,
@@ -33,21 +32,21 @@ export async function getProjectSummary(projectId: string) {
       originalAmount: c.originalAmount,
       authorizedAmount: authorized,
       executedAmount: executed,
-      paidAmount: paid,
       progressPercent: lastPayment?.percentComplete ?? 0,
     }
   })
 
   const totalContracted = contractSummary.reduce((s, c) => s + c.authorizedAmount, 0)
   const totalExecuted = contractSummary.reduce((s, c) => s + c.executedAmount, 0)
-  const totalPaid = contractSummary.reduce((s, c) => s + c.paidAmount, 0)
+  const availableAmount = budgetTotal - totalContracted
 
   return {
     project: { id: project.id, code: project.code, name: project.name, status: project.status },
+    approvedTotal,
     budgetTotal,
     totalContracted,
     totalExecuted,
-    totalPaid,
+    availableAmount,
     variance: budgetTotal - totalContracted,
     variancePercent: budgetTotal > 0 ? ((budgetTotal - totalContracted) / budgetTotal) * 100 : 0,
     contracts: contractSummary,
@@ -59,8 +58,7 @@ export async function getBudgetVsActual(projectId: string) {
     where: { id: projectId },
     include: {
       budgets: {
-        where: { isActive: true },
-        include: { lineItems: true },
+        include: { lineItems: { include: { adjustments: true } } },
       },
       contracts: {
         include: { additives: true, payments: true, budgetLineItem: true },
@@ -69,10 +67,10 @@ export async function getBudgetVsActual(projectId: string) {
   })
   if (!project) throw new AppError(404, 'Proyecto no encontrado')
 
-  const activeBudget = project.budgets[0]
-  if (!activeBudget) return { categories: [] }
+  const budget = project.budgets[0]
+  if (!budget) return { categories: [] }
 
-  const categories = activeBudget.lineItems.map(item => {
+  const categories = budget.lineItems.map(item => {
     const relatedContracts = project.contracts.filter(c => c.budgetLineItemId === item.id)
     const contracted = relatedContracts.reduce((sum, c) => {
       const authorized = c.originalAmount + c.additives.reduce((s, a) =>
@@ -80,16 +78,17 @@ export async function getBudgetVsActual(projectId: string) {
       return sum + authorized
     }, 0)
     const executed = relatedContracts.reduce((sum, c) =>
-      sum + c.payments.filter(p => ['approved', 'paid'].includes(p.status))
-        .reduce((s, p) => s + p.amount, 0), 0)
+      sum + c.payments.reduce((s, p) => s + p.amount, 0), 0)
 
     return {
       code: item.code,
       category: item.category,
       description: item.description,
+      approvedAmount: item.approvedAmount,
       budgetAmount: item.totalAmount,
       contractedAmount: contracted,
       executedAmount: executed,
+      available: item.totalAmount - contracted,
       variance: item.totalAmount - contracted,
     }
   })
@@ -101,8 +100,8 @@ export async function getDashboard() {
   const projects = await prisma.project.findMany({
     where: { status: { in: ['planning', 'active', 'on_hold'] } },
     include: {
-      budgets: { where: { isActive: true } },
-      contracts: { include: { additives: true, payments: { where: { status: { in: ['approved', 'paid'] } } } } },
+      budgets: true,
+      contracts: { include: { additives: true, payments: true } },
     },
   })
 
@@ -123,6 +122,7 @@ export async function getDashboard() {
       budgetTotal,
       totalContracted,
       totalExecuted,
+      availableAmount: budgetTotal - totalContracted,
       variance: budgetTotal - totalContracted,
       variancePercent: budgetTotal > 0 ? ((budgetTotal - totalContracted) / budgetTotal) * 100 : 0,
     }

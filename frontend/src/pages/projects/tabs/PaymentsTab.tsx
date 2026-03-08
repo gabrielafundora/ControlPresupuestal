@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../../api/client'
 import { Button } from '../../../components/ui/Button'
-import { Badge } from '../../../components/ui/Badge'
 import { Modal } from '../../../components/ui/Modal'
 import { Input } from '../../../components/ui/Input'
 import { Select } from '../../../components/ui/Select'
@@ -78,7 +77,6 @@ function NewPaymentForm({ contracts, onClose }: { contracts: Contract[]; onClose
 
 export function PaymentsTab({ projectId }: { projectId: string }) {
   const { user } = useAuthStore()
-  const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
 
   const { data: contracts, isLoading } = useQuery<Contract[]>({
@@ -86,35 +84,24 @@ export function PaymentsTab({ projectId }: { projectId: string }) {
     queryFn: () => api.get(`/projects/${projectId}/contracts`).then(r => r.data),
   })
 
-  const statusMutation = useMutation({
-    mutationFn: ({ contractId, paymentId, action }: { contractId: string; paymentId: string; action: string }) =>
-      api.post(`/contracts/${contractId}/payments/${paymentId}/${action}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['contracts', projectId] }),
-  })
-
   if (isLoading) return <PageSpinner />
 
   const contractsWithPayments = contracts?.filter(c => c.payments.length > 0) || []
   const allPayments = contracts?.flatMap(c => c.payments) || []
   const totalExecuted = contracts?.reduce((s, c) => s + c.executedAmount, 0) ?? 0
-  const totalPaid = contracts?.flatMap(c => c.payments).filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0) ?? 0
-  const pendingCount = allPayments.filter(p => ['draft', 'submitted'].includes(p.status)).length
+  const totalRegistered = allPayments.reduce((s, p) => s + p.amount, 0)
 
   return (
     <div className="space-y-6">
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <div className="text-sm text-gray-500">Total ejecutado</div>
           <div className="text-2xl font-bold text-gray-900 mt-1">{fmt.money(totalExecuted)}</div>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <div className="text-sm text-gray-500">Total pagado</div>
-          <div className="text-2xl font-bold text-green-600 mt-1">{fmt.money(totalPaid)}</div>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <div className="text-sm text-gray-500">Pendientes de autorizar</div>
-          <div className="text-2xl font-bold text-amber-600 mt-1">{pendingCount}</div>
+          <div className="text-sm text-gray-500">Total registrado</div>
+          <div className="text-2xl font-bold text-green-600 mt-1">{fmt.money(totalRegistered)}</div>
         </div>
       </div>
 
@@ -151,8 +138,6 @@ export function PaymentsTab({ projectId }: { projectId: string }) {
                 <th className="text-right px-4 py-3 text-gray-600 font-medium">Avance</th>
                 <th className="text-right px-4 py-3 text-gray-600 font-medium">Monto</th>
                 <th className="text-left px-4 py-3 text-gray-600 font-medium">Factura</th>
-                <th className="text-left px-4 py-3 text-gray-600 font-medium">Estatus</th>
-                <th className="px-4 py-3"></th>
               </tr></thead>
               <tbody>
                 {c.payments.map(p => (
@@ -169,20 +154,6 @@ export function PaymentsTab({ projectId }: { projectId: string }) {
                     </td>
                     <td className="px-4 py-3 text-right font-medium">{fmt.money(p.amount)}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{p.invoiceNumber || '—'}</td>
-                    <td className="px-4 py-3"><Badge status={p.status} /></td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1">
-                        {p.status === 'draft' && canUser(user?.role, 'create:payment') && (
-                          <Button size="sm" variant="ghost" onClick={() => statusMutation.mutate({ contractId: c.id, paymentId: p.id, action: 'submit' })}>Enviar</Button>
-                        )}
-                        {p.status === 'submitted' && canUser(user?.role, 'approve:payment') && (
-                          <Button size="sm" variant="ghost" onClick={() => statusMutation.mutate({ contractId: c.id, paymentId: p.id, action: 'approve' })}>Aprobar</Button>
-                        )}
-                        {p.status === 'approved' && canUser(user?.role, 'mark_paid:payment') && (
-                          <Button size="sm" variant="ghost" onClick={() => statusMutation.mutate({ contractId: c.id, paymentId: p.id, action: 'mark-paid' })}>Pagar</Button>
-                        )}
-                      </div>
-                    </td>
                   </tr>
                 ))}
               </tbody>
