@@ -1,0 +1,152 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         String   @default("readonly")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  payments Payment[]
+}
+
+model Project {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  name        String
+  description String?
+  status      String    @default("planning")
+  startDate   DateTime?
+  endDate     DateTime?
+  location    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  budgets   Budget[]
+  contracts Contract[]
+}
+
+model Budget {
+  id          String    @id @default(cuid())
+  projectId   String
+  version     Int
+  label       String?
+  isActive    Boolean   @default(false)
+  totalAmount Float     @default(0)
+  notes       String?
+  approvedAt  DateTime?
+  approvedBy  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  project   Project          @relation(fields: [projectId], references: [id])
+  lineItems BudgetLineItem[]
+
+  @@unique([projectId, version])
+}
+
+model BudgetLineItem {
+  id          String   @id @default(cuid())
+  budgetId    String
+  code        String
+  category    String
+  description String
+  unit        String
+  quantity    Float
+  unitPrice   Float
+  totalAmount Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  budget    Budget     @relation(fields: [budgetId], references: [id])
+  contracts Contract[]
+
+  @@unique([budgetId, code])
+}
+
+model Provider {
+  id        String   @id @default(cuid())
+  name      String
+  rfc       String?  @unique
+  contact   String?
+  email     String?
+  phone     String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contracts Contract[]
+}
+
+model Contract {
+  id               String    @id @default(cuid())
+  projectId        String
+  budgetLineItemId String?
+  providerId       String
+  contractNumber   String    @unique
+  description      String
+  originalAmount   Float
+  currency         String    @default("MXN")
+  signedAt         DateTime?
+  startDate        DateTime?
+  endDate          DateTime?
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  project        Project         @relation(fields: [projectId], references: [id])
+  budgetLineItem BudgetLineItem? @relation(fields: [budgetLineItemId], references: [id])
+  provider       Provider        @relation(fields: [providerId], references: [id])
+  additives      Additive[]
+  payments       Payment[]
+}
+
+model Additive {
+  id          String    @id @default(cuid())
+  contractId  String
+  type        String
+  number      Int
+  description String
+  amount      Float
+  approvedAt  DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  contract Contract @relation(fields: [contractId], references: [id])
+
+  @@unique([contractId, number])
+}
+
+model Payment {
+  id              String    @id @default(cuid())
+  contractId      String
+  submittedById   String
+  estimateNumber  Int
+  periodStart     DateTime
+  periodEnd       DateTime
+  percentComplete Float
+  amount          Float
+  status          String    @default("draft")
+  invoiceNumber   String?
+  invoiceDate     DateTime?
+  paidAt          DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  contract    Contract @relation(fields: [contractId], references: [id])
+  submittedBy User     @relation(fields: [submittedById], references: [id])
+
+  @@unique([contractId, estimateNumber])
+}

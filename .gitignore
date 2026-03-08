@@ -1,0 +1,43 @@
+# Dependencias
+node_modules/
+.npm
+
+# Base de datos
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Build
+dist/
+build/
+
+# Variables de entorno (¡nunca subir!)
+.env
+.env.local
+.env.*.local
+
+# Prisma migrations generadas localmente (sí subir el schema)
+# backend/prisma/migrations/ ← estas SÍ se suben
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Cache
+.cache/
+.parcel-cache/
+.turbo/
