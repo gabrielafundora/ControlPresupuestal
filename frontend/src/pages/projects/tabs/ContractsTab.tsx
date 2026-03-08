@@ -12,9 +12,11 @@ import { useAuthStore } from '../../../store/authStore'
 import { canUser } from '../../../lib/permissions'
 
 interface Provider { id: string; name: string }
+interface BudgetLineItem { id: string; code: string; description: string; category: string }
 interface Contract {
   id: string; contractNumber: string; description: string; originalAmount: number; authorizedAmount: number; executedAmount: number;
   provider: Provider; startDate?: string; endDate?: string;
+  budgetLineItem?: BudgetLineItem;
   additives: Array<{ id: string; type: string; number: number; description: string; amount: number; approvedAt?: string }>;
   payments: Array<{ id: string; estimateNumber: number; amount: number; status: string; percentComplete: number; periodStart: string; periodEnd: string; paidAt?: string }>;
 }
@@ -93,6 +95,13 @@ function ContractDetail({ contract, onClose }: { contract: Contract; onClose: ()
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-4 text-sm">
+        {contract.budgetLineItem && (
+          <div className="col-span-2 bg-blue-50 rounded-lg px-4 py-2">
+            <span className="text-gray-500">Partida: </span>
+            <span className="font-medium font-mono text-blue-700">{contract.budgetLineItem.code}</span>
+            <span className="text-gray-600"> — {contract.budgetLineItem.description}</span>
+          </div>
+        )}
         <div><span className="text-gray-500">Proveedor:</span> <span className="font-medium">{contract.provider.name}</span></div>
         <div><span className="text-gray-500">Monto original:</span> <span className="font-medium">{fmt.money(contract.originalAmount)}</span></div>
         <div><span className="text-gray-500">Monto autorizado:</span> <span className="font-bold text-blue-700">{fmt.money(contract.authorizedAmount)}</span></div>
@@ -205,7 +214,18 @@ function ContractDetail({ contract, onClose }: { contract: Contract; onClose: ()
 function ContractForm({ projectId, onClose }: { projectId: string; onClose: () => void }) {
   const qc = useQueryClient()
   const { data: providers } = useQuery<Provider[]>({ queryKey: ['providers'], queryFn: () => api.get('/providers').then(r => r.data) })
-  const [form, setForm] = useState({ providerId: '', contractNumber: '', description: '', originalAmount: '', startDate: '', endDate: '', notes: '' })
+  const { data: budgets } = useQuery<{ id: string; isActive: boolean; version: number; label: string }[]>({
+    queryKey: ['budgets', projectId],
+    queryFn: () => api.get(`/projects/${projectId}/budgets`).then(r => r.data),
+  })
+  const activeBudget = budgets?.find(b => b.isActive)
+  const { data: activeBudgetDetail } = useQuery<{ lineItems: Array<{ id: string; code: string; description: string; category: string }> }>({
+    queryKey: ['budget', activeBudget?.id],
+    queryFn: () => api.get(`/projects/${projectId}/budgets/${activeBudget?.id}`).then(r => r.data),
+    enabled: !!activeBudget?.id,
+  })
+
+  const [form, setForm] = useState({ budgetLineItemId: '', providerId: '', contractNumber: '', description: '', originalAmount: '', startDate: '', endDate: '', notes: '' })
   const [error, setError] = useState('')
   const mutation = useMutation({
     mutationFn: (data: Record<string, string | number>) => api.post(`/projects/${projectId}/contracts`, data),
@@ -213,8 +233,22 @@ function ContractForm({ projectId, onClose }: { projectId: string; onClose: () =
     onError: (err: unknown) => { const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error; setError(msg || 'Error') },
   })
   function set(f: string, v: string) { setForm(p => ({ ...p, [f]: v })) }
+
+  const lineItemOptions = activeBudgetDetail?.lineItems?.map(li => ({
+    value: li.id,
+    label: `${li.code} — ${li.description}`,
+  })) || []
+
   return (
     <form onSubmit={e => { e.preventDefault(); mutation.mutate({ ...form, originalAmount: Number(form.originalAmount) }) }} className="space-y-4">
+      <Select
+        label="Partida presupuestal"
+        value={form.budgetLineItemId}
+        onChange={e => set('budgetLineItemId', e.target.value)}
+        required
+        options={lineItemOptions}
+        placeholder={activeBudget ? 'Seleccionar partida...' : 'Sin presupuesto activo'}
+      />
       <Select label="Proveedor" value={form.providerId} onChange={e => set('providerId', e.target.value)} required options={providers?.map(p => ({ value: p.id, label: p.name })) || []} placeholder="Seleccionar proveedor..." />
       <div className="grid grid-cols-2 gap-4">
         <Input label="Número de contrato" value={form.contractNumber} onChange={e => set('contractNumber', e.target.value)} required placeholder="CON-2024-001" />
@@ -265,6 +299,11 @@ export function ContractsTab({ projectId }: { projectId: string }) {
                 </div>
                 <h4 className="font-semibold text-gray-900 mt-0.5">{c.description}</h4>
                 <p className="text-sm text-gray-500">{c.provider.name}</p>
+                {c.budgetLineItem && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    <span className="font-mono">{c.budgetLineItem.code}</span> — {c.budgetLineItem.description}
+                  </p>
+                )}
               </div>
               <Button size="sm" variant="secondary" onClick={() => setSelected(c)}>Ver detalle</Button>
             </div>

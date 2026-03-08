@@ -14,9 +14,10 @@ import { useAuthStore } from '../../store/authStore'
 import { canUser } from '../../lib/permissions'
 import { BudgetsTab } from './tabs/BudgetsTab'
 import { ContractsTab } from './tabs/ContractsTab'
+import { PaymentsTab } from './tabs/PaymentsTab'
 import { ReportTab } from './tabs/ReportTab'
 
-const TABS = ['Resumen', 'Presupuesto', 'Contratos', 'Reporte']
+const TABS = ['Resumen', 'Presupuesto', 'Contratos', 'Pagos', 'Reporte']
 
 const STATUS_OPTIONS = [
   { value: 'planning', label: 'Planeación' },
@@ -156,6 +157,7 @@ export function ProjectDetailPage() {
 
         {activeTab === 'Presupuesto' && <BudgetsTab projectId={id!} />}
         {activeTab === 'Contratos' && <ContractsTab projectId={id!} />}
+        {activeTab === 'Pagos' && <PaymentsTab projectId={id!} />}
         {activeTab === 'Reporte' && <ReportTab projectId={id!} />}
       </div>
 
